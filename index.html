@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aazhi — Island Vertical Slice</title>
+  <meta name="description" content="A compact, walkable Three.js recreation of the Kerala-inspired island reference with elevated metro station, waterfront café, and procedural vegetation." />
+  <meta property="og:title" content="Aazhi — Island Vertical Slice" />
+  <meta property="og:description" content="A compact, walkable Three.js recreation of the Kerala-inspired island reference with elevated metro station, waterfront café, and procedural vegetation." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <style>
+    :root { --ink: #fdf6ea; --panel: rgba(18, 28, 36, 0.62); --accent: #37c3c0; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #a9cde6; font-family: "Segoe UI", system-ui, sans-serif; }
+    canvas { display: block; touch-action: none; }
+    #hud { position: fixed; left: 16px; top: 16px; color: var(--ink); pointer-events: none; user-select: none; }
+    #hud h1 { margin: 0; font-size: 20px; letter-spacing: 0.08em; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.45); }
+    #hud p { margin: 2px 0 0; font-size: 12px; opacity: .85; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+    #panel { position: fixed; left: 16px; bottom: 16px; background: var(--panel); color: var(--ink); border-radius: 10px;
+      padding: 10px 12px; font-size: 12px; line-height: 1.55; backdrop-filter: blur(6px); max-width: 290px; }
+    #panel b { color: #fff; }
+    #panel kbd { background: rgba(255,255,255,.14); border-radius: 4px; padding: 0 5px; font-family: inherit; }
+    #mode { position: fixed; right: 16px; bottom: 16px; padding: 10px 16px; border: 0; border-radius: 999px; background: var(--accent);
+      color: #062a2c; font-weight: 700; font-size: 13px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+    #mode:hover { filter: brightness(1.08); }
+    #fps { position: fixed; right: 50px; top: 18px; color: var(--ink); font-size: 11px; opacity: .75; text-shadow: 0 1px 4px rgba(0,0,0,.5); pointer-events: none; user-select: none; font-variant-numeric: tabular-nums; }
+    #wind-btn {
+      position: fixed; top: 13px; right: 16px;
+      width: 28px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ink); background: var(--panel);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 7px; cursor: pointer;
+      padding: 0; user-select: none; z-index: 45;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    #wind-btn:hover, #wind-btn.active {
+      background: rgba(24, 42, 52, 0.85);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    #wind-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    #wind-debug {
+      position: fixed; top: 46px; right: 16px;
+      width: 244px;
+      color: var(--ink); background: rgba(14, 22, 29, 0.86);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
+      font-size: 11.5px; user-select: none;
+      z-index: 45;
+      display: none;
+    }
+    #wind-debug.open { display: block; }
+    #wind-debug-hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: grab;
+      font-weight: 700; font-size: 10.5px; letter-spacing: 0.06em;
+      color: var(--accent);
+    }
+    #wind-debug-hdr:active { cursor: grabbing; }
+    #wind-debug-close {
+      background: transparent; border: none; color: #c7d4dc;
+      font-size: 15px; line-height: 1; padding: 1px 5px;
+      border-radius: 4px; cursor: pointer;
+    }
+    #wind-debug-close:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+    .wd-body { padding: 9px 11px 11px; display: flex; flex-direction: column; gap: 8px; }
+    .wd-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .wd-presets button {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e2ecef;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 5px;
+      padding: 4px 2px;
+      font: 600 10px/1.1 "Segoe UI", system-ui, sans-serif;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .wd-presets button:hover { background: rgba(255, 255, 255, 0.16); }
+    .wd-presets button.active {
+      background: rgba(55, 195, 192, 0.22);
+      border-color: var(--accent);
+      color: #7bf2ef;
+    }
+    .wd-row { display: flex; flex-direction: column; gap: 2px; }
+    .wd-lbl { display: flex; justify-content: space-between; font-size: 10.5px; color: #cfdce2; font-variant-numeric: tabular-nums; }
+    .wd-lbl span:last-child { color: var(--accent); font-weight: 600; }
+    .wd-row input[type="range"] {
+      width: 100%; height: 4px; margin: 2px 0;
+      accent-color: var(--accent); cursor: pointer;
+    }
+    #wind-debug { width: 268px; max-height: calc(100vh - 120px); overflow-y: auto; }
+    .wd-sec { margin-top: 4px; font-size: 9.5px; letter-spacing: 0.09em; text-transform: uppercase; color: #8fb4bf; display: flex; justify-content: space-between; align-items: center; }
+    .wd-read { font-size: 10.5px; line-height: 1.5; color: #e2ecef; background: rgba(255,255,255,0.05); border-radius: 6px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+    .wd-read b { color: #7bf2ef; font-weight: 600; }
+    .wd-chk { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #cfdce2; cursor: pointer; }
+    .wd-chk input { accent-color: var(--accent); margin: 0; }
+    .wd-two { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .wd-two input, .wd-two select { min-width: 0; background: rgba(255,255,255,0.08); color: #e2ecef; border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; padding: 3px 4px; font: 500 10.5px "Segoe UI", system-ui, sans-serif; color-scheme: dark; }
+    .wd-wx { grid-template-columns: repeat(3, 1fr); }
+    .wd-btn, .wd-mini { background: rgba(255,255,255,0.08); color: #e2ecef; border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; padding: 4px 2px; font: 600 10px/1.1 "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+    .wd-btn:hover, .wd-mini:hover { background: rgba(255,255,255,0.16); }
+    .wd-mini { padding: 2px 6px; font-size: 9px; text-transform: none; letter-spacing: 0; }
+    .wd-lbl span.auto { color: #7d939b !important; font-weight: 400 !important; }
+    @media (max-width: 600px) { #wind-debug { width: calc(100vw - 32px); max-height: 55vh; } }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; background: linear-gradient(#4f8fcf, #f3d9b5);
+      color: #fff; font-size: 15px; letter-spacing: .1em; transition: opacity .5s; }
+    @media (max-width: 600px) { #panel { max-width: calc(100vw - 32px - 130px); font-size: 11px; } }
+  </style>
+</head>
+<body>
+  <div id="loading">BUILDING ISLAND…</div>
+  <div id="hud"><h1>AAZHI</h1><p>Kochi island · vertical slice</p></div>
+  <div id="panel"></div>
+  <div id="fps"></div>
+  <button id="wind-btn" title="Sky, weather &amp; time dev controls" aria-label="Sky, weather and time controls">
+    <svg viewBox="0 0 24 24">
+      <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
+    </svg>
+  </button>
+  <div id="wind-debug">
+    <div id="wind-debug-hdr">
+      <span>SKY · WEATHER · TIME</span>
+      <button id="wind-debug-close" title="Close">&times;</button>
+    </div>
+    <div class="wd-body">
+      <div class="wd-read" id="sw-read"></div>
+
+      <div class="wd-sec">Time</div>
+      <div class="wd-row">
+        <div class="wd-lbl"><span>Time of day</span><span id="sw-time-val"></span></div>
+        <input id="sw-time" type="range" min="0" max="24" step="0.02" value="16.5" />
+      </div>
+      <div class="wd-two">
+        <input id="sw-date" type="date" />
+        <select id="sw-speed">
+          <option value="0">Paused</option>
+          <option value="1">Real time</option>
+          <option value="60">1 min = 1 h</option>
+          <option value="72" selected>Day = 20 min</option>
+          <option value="720">5 s = 1 h</option>
+          <option value="3600">1 s = 1 h</option>
+        </select>
+      </div>
+      <div class="wd-presets">
+        <button type="button" data-hour="6.05">Sunrise</button>
+        <button type="button" data-hour="12.4">Noon</button>
+        <button type="button" data-hour="18.15">Sunset</button>
+        <button type="button" data-hour="22.5">Night</button>
+      </div>
+
+      <div class="wd-sec">Moon</div>
+      <label class="wd-chk"><input id="sw-moon-auto" type="checkbox" checked /> Real lunar calendar</label>
+      <div class="wd-row">
+        <div class="wd-lbl"><span>Moon age</span><span id="sw-moon-val"></span></div>
+        <input id="sw-moon" type="range" min="0" max="29.5" step="0.1" value="14" />
+      </div>
+
+      <div class="wd-sec">Weather</div>
+      <label class="wd-chk"><input id="sw-auto" type="checkbox" checked /> Automatic (Kerala seasons)</label>
+      <div class="wd-presets wd-wx" id="sw-wx"></div>
+      <div class="wd-row">
+        <div class="wd-lbl"><span>Transition</span><span id="sw-trans-val">12 s</span></div>
+        <input id="sw-trans" type="range" min="1" max="60" step="1" value="12" />
+      </div>
+
+      <div id="sw-extreme"></div>
+
+      <div class="wd-sec">Overrides <button type="button" id="sw-reset" class="wd-mini">reset all</button></div>
+      <div id="sw-ov"></div>
+
+      <div class="wd-two">
+        <button type="button" id="sw-strike" class="wd-btn">Lightning strike</button>
+        <button type="button" id="sw-sound" class="wd-btn">Sound: on</button>
+      </div>
+      <div class="wd-two">
+        <button type="button" id="sw-quality" class="wd-btn">Quality</button>
+        <button type="button" id="sw-now" class="wd-btn">Now (live clock)</button>
+      </div>
+    </div>
+  </div>
+  <button id="mode">Walk the island</button>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
+
